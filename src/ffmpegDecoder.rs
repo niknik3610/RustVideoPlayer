@@ -1,16 +1,18 @@
-use std::ptr::null_mut;
-use rusty_ffmpeg::ffi::{AVCodec, AVCodecContext, AVCodecParameters, AVFrame, AVPacket, AVStream, av_find_best_stream, avcodec_alloc_context3, avcodec_find_decoder, avcodec_open2, avcodec_parameters_to_context};
+use std::{ptr::null_mut, sync::mpsc::{Receiver, Sender}};
+use rusty_ffmpeg::ffi::{AVCodec, AVCodecContext, AVCodecParameters, AVFrame, AVPacket, AVStream, avcodec_alloc_context3, avcodec_find_decoder, avcodec_open2, avcodec_parameters_to_context};
 
 use crate::{consumer::Consumer, producer::Producer};
 
 
 struct FFmpegDecoder {
     context: AVCodecContext,
-    decoder: AVCodec
+    decoder: AVCodec,
+    consumer_channel: Option<Receiver<AVPacket>>,
+    producer_channel: Option<Sender<AVFrame>>,
 }
 
 impl FFmpegDecoder {
-    pub fn new(stream: &AVStream, codec_par: &AVCodecParameters) -> Self {
+    pub fn new(stream: &AVStream, codec_par: &AVCodecParameters, consumer_channel: Option<Receiver<AVPacket>>, producer_channel: Option<Sender<AVFrame>>) -> Self {
         let (decoder_ctx, dec) = match Self::open(stream, codec_par) {
             Ok(v) => v,
             Err(e) => panic!("Unable to open decoder: {}", e)
@@ -18,7 +20,9 @@ impl FFmpegDecoder {
 
         return Self {
             context: decoder_ctx,
-            decoder: dec
+            decoder: dec,
+            consumer_channel,
+            producer_channel
         }
     }
 
@@ -51,20 +55,3 @@ impl FFmpegDecoder {
         return Ok((decoder_ctx, dec));
     }
 }
-
-impl Producer<AVFrame> for FFmpegDecoder {
-    fn produce(&self) {
-        todo!()
-    }
-
-    fn set_channel(&mut self, channel: std::sync::mpsc::Sender<AVFrame>) {
-        todo!()
-    }
-}
-
-impl Consumer<AVPacket> for FFmpegDecoder {
-    fn consume(&self, to_consume: AVPacket) {
-        todo!()
-    }
-}
-

@@ -1,7 +1,7 @@
-use std::{ffi::{CStr, CString}, ptr::{null, null_mut}};
+use std::{ffi::CString, ptr::{null, null_mut}};
 
-use rusty_ffmpeg::ffi::{AVCodecContext, AVFormatContext, AVMediaType, AVPacket, AVStream, av_find_best_stream, avcodec_alloc_context3, avcodec_find_decoder, avcodec_open2, avcodec_parameters_copy, avcodec_parameters_to_context, avformat_alloc_context, avformat_find_stream_info, avformat_open_input};
-use crate::{ffmpegDemuxer, producer};
+use rusty_ffmpeg::ffi::{AVFormatContext, AVPacket, avformat_alloc_context, avformat_find_stream_info, avformat_open_input};
+use crate::producer;
 
 struct FFmpegDemuxer {
     file_uri: String,
@@ -44,17 +44,4 @@ impl FFmpegDemuxer {
 
         return Ok(format_ctx);
     }
-
-
 }
-
-impl producer::Producer<AVPacket> for FFmpegDemuxer {
-    fn produce(&self) {
-
-    }
-
-    fn set_channel(&mut self, channel: std::sync::mpsc::Sender<AVPacket>) {
-        self.producer_channel = Some(channel);
-    }
-}
-
