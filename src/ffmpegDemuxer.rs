@@ -1,12 +1,12 @@
 use std::{ffi::CString, ptr::{null, null_mut}};
 
-use rusty_ffmpeg::ffi::{AVFormatContext, AVPacket, avformat_alloc_context, avformat_find_stream_info, avformat_open_input};
-use crate::producer::{self, Producer};
+use rusty_ffmpeg::ffi::{AVFormatContext, AVPacket, av_packet_alloc, av_read_frame, avformat_alloc_context, avformat_find_stream_info, avformat_open_input};
+use crate::{producer::{self, Producer}, wrappers::WrappedAVPacket};
 
 struct FFmpegDemuxer {
     file_uri: String,
     context: AVFormatContext,
-    producer: Producer<AVPacket>
+    producer: Producer<WrappedAVPacket>
 }
 
 impl FFmpegDemuxer {
@@ -46,5 +46,22 @@ impl FFmpegDemuxer {
 
         return Ok(format_ctx);
     }
-}
+    pub fn run(&mut self) -> Result<(), String> {
+        unsafe {
+            let mut packet = av_packet_alloc();
+            if packet.is_null() {
+                return panic!("Unable to allocate a packet");
+            }
 
+            while av_read_frame(&mut self.context, packet) >= 0 {
+                let wrapped_packet = WrappedAVPacket(packet);
+                self.producer.produce(wrapped_packet); 
+                packet = av_packet_alloc();
+            }
+
+
+        }
+
+        return Ok(())
+    }
+}

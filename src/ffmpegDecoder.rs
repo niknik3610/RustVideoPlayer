@@ -1,13 +1,13 @@
 use std::{ptr::null_mut, sync::mpsc::{Receiver, Sender}};
-use rusty_ffmpeg::ffi::{AVCodec, AVCodecContext, AVCodecParameters, AVFrame, AVPacket, AVStream, avcodec_alloc_context3, avcodec_find_decoder, avcodec_open2, avcodec_parameters_to_context};
+use rusty_ffmpeg::ffi::{AVCodec, AVCodecContext, AVCodecParameters, AVFrame, AVPacket, AVStream, av_frame_alloc, avcodec_alloc_context3, avcodec_find_decoder, avcodec_open2, avcodec_parameters_to_context, avcodec_receive_frame, avcodec_send_packet};
 
-use crate::{consumer::Consumer, producer::Producer};
+use crate::{consumer::Consumer, producer::Producer, wrappers::{WrappedAVFrame, WrappedAVPacket}};
 
 
 struct FFmpegDecoder {
     context: AVCodecContext,
     decoder: AVCodec,
-    producer: Producer<AVFrame>
+    producer: Producer<WrappedAVFrame>,
 }
 
 impl FFmpegDecoder {
@@ -20,7 +20,7 @@ impl FFmpegDecoder {
         return Self {
             context: decoder_ctx,
             decoder: dec,
-            producer: Producer::new()
+            producer: Producer::new(),
         }
     }
 
@@ -52,10 +52,29 @@ impl FFmpegDecoder {
 
         return Ok((decoder_ctx, dec));
     }
+    fn decode_packet(&mut self, to_decode: &WrappedAVPacket) {
+        unsafe {
+            let res = avcodec_send_packet(&mut self.context, to_decode.0);
+            if res < 0 {
+                println!("Error sending packet: {}", res);
+                return;
+            }
+
+            let mut frame = av_frame_alloc();
+            if frame.is_null() {
+                panic!("Failed to alloc avFrame");
+            }
+
+            while avcodec_receive_frame(&mut self.context, frame) >= 0 {
+                self.producer.produce(WrappedAVFrame(frame));
+                frame = av_frame_alloc();
+            }
+        }
+    }
 }
 
-impl Consumer<AVPacket> for FFmpegDecoder {
-    fn consume(&self, to_consume: &AVPacket) {
+impl Consumer<WrappedAVPacket> for FFmpegDecoder {
+    fn consume(&self, to_consume: WrappedAVPacket) {
         todo!()
     }
 }
