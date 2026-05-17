@@ -7,8 +7,7 @@ use crate::{consumer::Consumer, producer::Producer};
 struct FFmpegDecoder {
     context: AVCodecContext,
     decoder: AVCodec,
-    consumer_channel: Option<Receiver<AVPacket>>,
-    producer_channel: Option<Sender<AVFrame>>,
+    producer: Producer<AVFrame>
 }
 
 impl FFmpegDecoder {
@@ -21,8 +20,7 @@ impl FFmpegDecoder {
         return Self {
             context: decoder_ctx,
             decoder: dec,
-            consumer_channel,
-            producer_channel
+            producer: Producer::new()
         }
     }
 
@@ -53,5 +51,11 @@ impl FFmpegDecoder {
         };
 
         return Ok((decoder_ctx, dec));
+    }
+}
+
+impl Consumer<AVPacket> for FFmpegDecoder {
+    fn consume(&self, to_consume: &AVPacket) {
+        todo!()
     }
 }
