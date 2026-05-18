@@ -1,16 +1,16 @@
-use std::{ffi::CString, ptr::{null, null_mut}};
+use std::{collections::btree_map::Range, ffi::CString, ptr::{null, null_mut}};
 
-use rusty_ffmpeg::ffi::{AVFormatContext, AVPacket, av_packet_alloc, av_read_frame, avformat_alloc_context, avformat_find_stream_info, avformat_open_input};
+use rusty_ffmpeg::ffi::{AVFormatContext, AVMEDIA_TYPE_VIDEO, AVMediaType, AVPacket, AVStream, av_packet_alloc, av_read_frame, avformat_alloc_context, avformat_find_stream_info, avformat_open_input};
 use crate::{producer::{self, Producer}, wrappers::WrappedAVPacket};
 
-struct FFmpegDemuxer {
+pub struct FFmpegDemuxer {
     file_uri: String,
     context: AVFormatContext,
-    producer: Producer<WrappedAVPacket>
+    pub producer: Producer<WrappedAVPacket>
 }
 
 impl FFmpegDemuxer {
-    pub fn new(file_uri: String, producer_channel: Option<std::sync::mpsc::Sender<AVPacket>>) -> Self {
+    pub fn new(file_uri: String) -> Self {
         let context = match Self::open(&file_uri) {
             Ok(v) => v,
             Err(e) => panic!("Unable to open file: {}", e)
@@ -59,9 +59,21 @@ impl FFmpegDemuxer {
                 packet = av_packet_alloc();
             }
 
-
         }
 
         return Ok(())
+    }
+    pub fn get_video_stream(&self) -> Result<&AVStream, String> {
+        let streams: &[*mut AVStream] = unsafe { std::slice::from_raw_parts(self.context.streams, self.context.nb_streams as usize) };
+
+        for &ptr in streams {
+            let stream = unsafe { &*ptr };
+            let stream_type = unsafe { (*stream.codecpar).codec_type };
+            if stream_type == AVMEDIA_TYPE_VIDEO {
+                return Ok(stream);
+            }
+        }
+
+        return Err("No Video stream found".to_string());
     }
 }

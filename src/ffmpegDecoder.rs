@@ -3,15 +3,16 @@ use rusty_ffmpeg::ffi::{AVCodec, AVCodecContext, AVCodecParameters, AVFrame, AVP
 
 use crate::{consumer::Consumer, producer::Producer, wrappers::{WrappedAVFrame, WrappedAVPacket}};
 
-
-struct FFmpegDecoder {
+pub struct FFmpegDecoder {
     context: AVCodecContext,
     decoder: AVCodec,
-    producer: Producer<WrappedAVFrame>,
+    pub producer: Producer<WrappedAVFrame>,
+    stream_index: i32,
 }
 
 impl FFmpegDecoder {
-    pub fn new(stream: &AVStream, codec_par: &AVCodecParameters, consumer_channel: Option<Receiver<AVPacket>>, producer_channel: Option<Sender<AVFrame>>) -> Self {
+    pub fn new(stream: &AVStream) -> Self {
+        let codec_par = unsafe { &*stream.codecpar };
         let (decoder_ctx, dec) = match Self::open(stream, codec_par) {
             Ok(v) => v,
             Err(e) => panic!("Unable to open decoder: {}", e)
@@ -21,6 +22,7 @@ impl FFmpegDecoder {
             context: decoder_ctx,
             decoder: dec,
             producer: Producer::new(),
+            stream_index: stream.index,
         }
     }
 
@@ -71,10 +73,14 @@ impl FFmpegDecoder {
             }
         }
     }
+    //TODO: close with flush here
 }
 
 impl Consumer<WrappedAVPacket> for FFmpegDecoder {
-    fn consume(&self, to_consume: WrappedAVPacket) {
-        todo!()
+    fn consume(&mut self, to_consume: WrappedAVPacket) {
+        let idx = unsafe { (*to_consume.0).stream_index };
+        if idx == self.stream_index {
+            self.decode_packet(&to_consume);
+        }
     }
 }
