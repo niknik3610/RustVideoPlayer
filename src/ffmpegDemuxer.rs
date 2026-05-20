@@ -1,11 +1,11 @@
 use std::{collections::btree_map::Range, ffi::CString, ptr::{null, null_mut}};
 
-use rusty_ffmpeg::ffi::{AVFormatContext, AVMEDIA_TYPE_VIDEO, AVMediaType, AVPacket, AVStream, av_packet_alloc, av_read_frame, avformat_alloc_context, avformat_find_stream_info, avformat_open_input};
+use rusty_ffmpeg::ffi::{AVFormatContext, AVMEDIA_TYPE_VIDEO, AVMediaType, AVPacket, AVStream, av_dump_format, av_packet_alloc, av_read_frame, avformat_alloc_context, avformat_find_stream_info, avformat_open_input};
 use crate::{producer::{self, Producer}, wrappers::WrappedAVPacket};
 
 pub struct FFmpegDemuxer {
     file_uri: String,
-    context: AVFormatContext,
+    context: *mut AVFormatContext,
     pub producer: Producer<WrappedAVPacket>
 }
 
@@ -22,7 +22,7 @@ impl FFmpegDemuxer {
             producer: Producer::new()
         };
     }
-    fn open(file_uri: &String) -> Result<AVFormatContext, String> {
+    fn open(file_uri: &String) -> Result<*mut AVFormatContext, String> {
         let format_ctx = unsafe {
             let mut format_context = avformat_alloc_context();
             if format_context.is_null() {
@@ -41,21 +41,29 @@ impl FFmpegDemuxer {
                 return Err(format!("Unable to find stream info with code: {}", res));
             }
 
-            *format_context
+            av_dump_format(format_context, 0, uri.as_ptr(), 0);
+
+            format_context
         };
+
 
         return Ok(format_ctx);
     }
     pub fn run(&mut self) -> Result<(), String> {
+        let mut i = 0;
         unsafe {
             let mut packet = av_packet_alloc();
             if packet.is_null() {
-                return panic!("Unable to allocate a packet");
+                panic!("Unable to allocate a packet");
             }
 
-            while av_read_frame(&mut self.context, packet) >= 0 {
+            while av_read_frame(self.context, packet) >= 0 {
+                println!("Demuxed Frame {}", i);
+                i += 1;
+
                 let wrapped_packet = WrappedAVPacket(packet);
                 self.producer.produce(wrapped_packet); 
+
                 packet = av_packet_alloc();
             }
 
@@ -64,7 +72,8 @@ impl FFmpegDemuxer {
         return Ok(())
     }
     pub fn get_video_stream(&self) -> Result<&AVStream, String> {
-        let streams: &[*mut AVStream] = unsafe { std::slice::from_raw_parts(self.context.streams, self.context.nb_streams as usize) };
+        let context = unsafe { &*self.context };
+        let streams: &[*mut AVStream] = unsafe { std::slice::from_raw_parts(context.streams, context.nb_streams as usize) };
 
         for &ptr in streams {
             let stream = unsafe { &*ptr };

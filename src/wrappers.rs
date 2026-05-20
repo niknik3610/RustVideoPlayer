@@ -1,5 +1,6 @@
 use rusty_ffmpeg::ffi::{AVFrame, AVPacket, av_frame_clone, av_frame_free, av_packet_clone, av_packet_free};
 
+//Idea here is to make ownership semantics clear. WrappedAVPacket owns its packet 
 pub struct WrappedAVPacket(pub *mut AVPacket);
 //Tells compiler it is safe to transfer ownership of this object to another thread
 unsafe impl Send for WrappedAVPacket {}             

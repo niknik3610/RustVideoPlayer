@@ -11,8 +11,11 @@ impl <T:Clone> Producer<T> {
             consumers: vec![],
         }
     }
-    pub fn produce(&self, product: T) {
-        for consumer in self.consumers.iter() {
+    pub fn produce(&mut self, product: T) {
+        // if self.consumers.len() == 1 {
+        //     self.consumers[0].consume(product);
+        // }
+        for consumer in self.consumers.iter_mut() {
             consumer.consume(product.clone());
         }
     }
